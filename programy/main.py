@@ -20,10 +20,12 @@ class CameraReaderThread(threading.Thread):
 
    def run(self):
       # Nieskończona pętla do ciągłego czytania ramek z kamery
-      while True:
+      while not self.loop.is_set():
          # Czytanie bieżącej ramki z kamery
          ret, self.curr_frame = self.camera.read()
          # Zablokowanie dostępu do zasobów podczas aktualizacji ostatniej ramki
+         if not ret:
+            break
          if self.lock.acquire(timeout=0):
             try:
                # Kopiowanie bieżącej ramki do ostatniej ramki
@@ -48,7 +50,7 @@ class CameraReaderThread(threading.Thread):
 model = cv2.CascadeClassifier('haarcascade_frontalface_alt_tree.xml')
 
 # Ustalenie adresu strumienia wideo
-address = "rtsp://admin:Alabama23@192.168.114.122"
+address = 0    #zmieniamy wartość w zależności do ilu urządzeń jesteśmy podłączeni
 # Nawiązanie połączenia ze strumieniem wideo
 cap = cv2.VideoCapture(address)
 if not cap.isOpened():
@@ -71,8 +73,8 @@ while True:
       # Rysowanie prostokątów wokół wykrytych twarzy
       for (x, y, w, h) in faces:
          cv2.rectangle(frame, (x, y), (x + w, y + h), (190, 0, 0), 2)
-      # Wyświetlanie ramki z zaznaczonymi twarzami
-      cv2.imshow(address, frame)
+      # Wyświetlanie ramki z zaznaczonymi twarzami z nazwą okna
+      cv2.imshow("Camera Feed", frame)
    # Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia
    if cv2.waitKey(30) & 0xFF == ord('q'):
       break
