@@ -19,7 +19,7 @@ class CameraReaderThread(threading.Thread):
       self.start()
 
    def run(self):
-      # Nieskończona pętla do ciągłego czytania ramek z kamery
+      # Pętla do ciągłego czytania ramek z kamery
       while not self.loop.is_set():
          # Czytanie bieżącej ramki z kamery
          ret, self.curr_frame = self.camera.read()
@@ -50,7 +50,7 @@ class CameraReaderThread(threading.Thread):
 model = cv2.CascadeClassifier('haarcascade_frontalface_alt_tree.xml')
 
 # Ustalenie adresu strumienia wideo
-address = 0    #zmieniamy wartość w zależności do ilu urządzeń jesteśmy podłączeni
+address = 0    # Zmieniamy wartość w zależności do ilu urządzeń jesteśmy podłączeni
 # Nawiązanie połączenia ze strumieniem wideo
 cap = cv2.VideoCapture(address)
 if not cap.isOpened():
@@ -75,12 +75,21 @@ while True:
          cv2.rectangle(frame, (x, y), (x + w, y + h), (190, 0, 0), 2)
       # Wyświetlanie ramki z zaznaczonymi twarzami z nazwą okna
       cv2.imshow("Camera Feed", frame)
-   # Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia
-   if cv2.waitKey(30) & 0xFF == ord('q'):
+
+   # Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia lub 's' do zapisania
+   key = cv2.waitKey(0) & 0xFF
+   if key == ord('q'):
       break
+   elif key == ord('s') and faces is not None:
+      # Wycinanie twarzy z ramki, gdy wykryto twarze i naciśnięto 's'
+      for i, (x, y, w, h) in enumerate(faces):
+         face_frame = frame[y:y + h, x:x + w]
+         # Wyświetlanie oddzielnej ramki
+         cv2.imshow("Face frame", face_frame)
 
 # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
 reader.stop()
 cap.release()
 cv2.destroyAllWindows()
+
 
