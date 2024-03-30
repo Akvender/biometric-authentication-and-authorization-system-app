@@ -77,7 +77,7 @@ while True:
       cv2.imshow("Camera Feed", frame)
 
    # Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia lub 's' do zapisania
-   key = cv2.waitKey(0) & 0xFF
+   key = cv2.waitKey(30) & 0xFF
    if key == ord('q'):
       break
    elif key == ord('s') and faces is not None:
