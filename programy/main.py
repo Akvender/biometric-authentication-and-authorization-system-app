@@ -3,6 +3,21 @@ import copy  # Importowanie modułu do kopiowania obiektów
 import cv2  # Importowanie biblioteki OpenCV do przetwarzania obrazów
 import sqlite3    # Importowanie biblioteki sqlite3 do tworzenia i obsługi bazy danych
 
+# Inicjalizacja bazy danych
+db = sqlite3.connect("Baza_osób_upoważnionych.db")
+cursor = db.cursor()
+
+cursor.execute('''
+      CREATE TABLE IF NOT EXISTS users 
+         (
+         id INTEGER,
+         name STRING,   
+         surname STRING,
+         image BLOB
+         )
+''')
+
+
 # Funkcja do sprawdzenia, czy tabela użytkowników jest pusta
 def is_users_table_empty():
     db = sqlite3.connect("Baza_osób_upoważnionych.db")
@@ -109,7 +124,8 @@ while True:
          face_frame = frame[y:y + h, x:x + w]
          # Wyświetlanie oddzielnej ramki
          cv2.imshow("Face frame", face_frame)
-
+         # Zapis tej ramki do bazy danych
+         save_new_user(face_frame)
 
 # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
 reader.stop()
