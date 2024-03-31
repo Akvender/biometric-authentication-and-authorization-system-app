@@ -1,6 +1,29 @@
 import threading  # Importowanie modułu do obsługi wątków
 import copy  # Importowanie modułu do kopiowania obiektów
 import cv2  # Importowanie biblioteki OpenCV do przetwarzania obrazów
+import sqlite3    # Importowanie biblioteki sqlite3 do tworzenia i obsługi bazy danych
+
+# Funkcja do sprawdzenia, czy tabela użytkowników jest pusta
+def is_users_table_empty():
+    db = sqlite3.connect("Baza_osób_upoważnionych.db")
+    cursor = db.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+    db.close()
+    return count == 0
+
+# Funkcja do zapisywania nowego użytkownika
+def save_new_user(image):
+    name = input("Podaj imię: ")
+    surname = input("Podaj nazwisko: ")
+    db = sqlite3.connect("Baza_osób_upoważnionych.db")
+    cursor = db.cursor()
+    _, img_encoded = cv2.imencode('.jpg', image)
+    img_bytes = img_encoded.tobytes()
+    cursor.execute("INSERT INTO users (name, surname, image) VALUES (?, ?, ?)", (name, surname, img_bytes))
+    db.commit()
+    db.close()
+    print("Zapisano nowego użytkownika.")
 
 # Klasa CameraReaderThread służy do ciągłego czytania ramek z kamery w osobnym wątku
 class CameraReaderThread(threading.Thread):
@@ -75,8 +98,8 @@ while True:
          cv2.rectangle(frame, (x, y), (x + w, y + h), (190, 0, 0), 2)
       # Wyświetlanie ramki z zaznaczonymi twarzami z nazwą okna
       cv2.imshow("Camera Feed", frame)
-
    # Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia lub 's' do zapisania
+
    key = cv2.waitKey(30) & 0xFF
    if key == ord('q'):
       break
@@ -86,6 +109,7 @@ while True:
          face_frame = frame[y:y + h, x:x + w]
          # Wyświetlanie oddzielnej ramki
          cv2.imshow("Face frame", face_frame)
+
 
 # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
 reader.stop()
