@@ -1,7 +1,7 @@
 import threading  # Importowanie modułu do obsługi wątków
 import copy  # Importowanie modułu do kopiowania obiektów
 import cv2  # Importowanie biblioteki OpenCV do przetwarzania obrazów
-import sqlite3    # Importowanie biblioteki sqlite3 do tworzenia i obsługi bazy danych
+import sqlite3  # Importowanie biblioteki sqlite3 do tworzenia i obsługi bazy danych
 import time
 # Inicjalizacja bazy danych
 db = sqlite3.connect("Baza_osób_upoważnionych.db")
@@ -12,7 +12,6 @@ cursor.execute('''
 	(
 	id INTEGER,
 	name STRING,   
-	surname STRING,
 	image BLOB 
 	)
 ''')
@@ -85,11 +84,11 @@ class CameraReaderThread(threading.Thread):
 # Logika działania prostego interfejsu dla użytkownika
 if is_users_table_empty():
 	print("Witaj użytkowniku, wprowadź swoje dane do programu")
-	name = input("Podaj swoje imie")
-	print("Zaraz nastąpi skan twarzy, proszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz")
+	name = input("Podaj swoje imie: ")
+	print("Zaraz nastąpi skan twarzy, proszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz, lub 'q' jeśli chcesz przerwać")
 	time.sleep(3)
 else:
-	print("Witaj użytkowniku, zaraz nastąpi weryfikacja twojej tożsamości \nproszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz")
+	print("Witaj użytkowniku, zaraz nastąpi weryfikacja twojej tożsamości \nproszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz lub 'q' jeśli chcesz przerwać")
 	time.sleep(3)
 
 
@@ -130,8 +129,11 @@ while True:
 		# Wycinanie twarzy z ramki, gdy wykryto twarze i naciśnięto 's'
 		for (x, y, w, h) in faces:
 			face_frame = frame[y:y + h, x:x + w]
-			# Zapis tej ramki do bazy danych
-			save_new_user(face_frame, name)
+			if is_users_table_empty():
+				# Zapis tej ramki do bazy danych
+				save_new_user(face_frame, name)
+			else:
+				frame_for_equal = face_frame
 		break
 
 # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
