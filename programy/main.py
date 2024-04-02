@@ -2,6 +2,7 @@ import threading
 import copy
 import cv2
 import sqlite3
+import matplotlib.pyplot as plt
 import numpy as np
 from deepface import DeepFace
 
@@ -31,7 +32,7 @@ class DatabaseManager:
 				np_img = np.frombuffer(img_blob, dtype=np.uint8)
 				image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 				_, img_encoded = cv2.imencode('.jpg', image)  # Kodowanie obrazu do formatu, który może być używany przez DeepFace.verify
-				return img_encoded.tobytes()  # Zwrócenie obrazu w postaci bajtów
+				return img_encoded  # Zwrócenie obrazu w postaci bajtów
 			else:
 				print("Użytkownik nie znaleziony.")
 				return None
@@ -47,10 +48,8 @@ class DatabaseManager:
 			self.cursor.execute("INSERT INTO users (username, image) VALUES (?, ?)", (username, img_bytes))
 			self.conn.commit()
 			print("Zapisano nowego użytkownika.")
-			return True
 		except sqlite3.Error as e:
 			print(f"Błąd bazy danych: {e}")
-			return False
 
 
 	def how_many_users_in_db(self):
@@ -95,6 +94,7 @@ class CameraReaderThread(threading.Thread):
         self.loop.set()
 
 
+
 def main():
 	db_manager = DatabaseManager("Baza_osób_upoważnionych.db")
 
@@ -105,7 +105,7 @@ def main():
 	else:
 		print("Witaj użytkowniku\n")
 		username = input("Podaj nazwę: ")
-		image_from_db_to_compare = db_manager.get_user_image(username)
+		img1 = db_manager.get_user_image(username)
 
 	# Inicjalizacja modelu do wykrywania twarzy
 	face_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -138,22 +138,35 @@ def main():
 			key = cv2.waitKey(30) & 0xFF
 			if key == ord('q'):
 				break
-			elif key == ord('s') and len(faces) > 0 and image_from_db_to_compare is not None:
+			elif key == ord('s') and len(faces) > 0:
 				for (x, y, w, h) in faces:
-					face_frame = frame[y:y + h, x:x + w]
-					_, img_encoded = cv2.imencode('.jpg', face_frame)
-					result_of_comparing = DeepFace.verify(img1_path=image_from_db_to_compare, img2_path=img_encoded.tobytes(), enforce_detection=False)
-					print(result_of_comparing['verified'])
+					if db_manager.how_many_users_in_db() == 0:
+						face_frame = frame[y:y + h, x:x + w]
+						db_manager.save_new_user(face_frame, username)
+					else:
+						face_frame = frame[y:y + h, x:x + w]
+						_, img_encoded = cv2.imencode('.jpg', face_frame)
+						img2 = img_encoded
+				break
+
+		if db_manager.how_many_users_in_db() != 0:
+			plt.imshow(img1[:, :, ::-1])
+			plt.show()
+			plt.imshow(img2[:, :, ::-1])
+			plt.show()
+
+			result = DeepFace.verify(img1, img2)
+			print("Czy to ta sama twarz: "), result["verified"]\
 
 	except Exception as e:
 		print(f"Wystąpił błąd: {e}")
+
 	finally:
 		# Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
 		camera_thread.stop()
 		cap.release()
 		cv2.destroyAllWindows()
 		db_manager.close()
-# Zakończenie pracy z zasobami
 
 if __name__ == "__main__":
 	main()
