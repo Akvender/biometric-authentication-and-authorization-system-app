@@ -1,143 +1,152 @@
-import threading  # Importowanie modułu do obsługi wątków
-import copy  # Importowanie modułu do kopiowania obiektów
-import cv2  # Importowanie biblioteki OpenCV do przetwarzania obrazów
-import sqlite3  # Importowanie biblioteki sqlite3 do tworzenia i obsługi bazy danych
-import time
-# Inicjalizacja bazy danych
-db = sqlite3.connect("Baza_osób_upoważnionych.db")
-cursor = db.cursor()
+import threading
+import copy
+import cv2
+import sqlite3
+from deepface import Deepface
+import numpy as np
 
-cursor.execute('''
-	CREATE TABLE IF NOT EXISTS users 
-	(
-	id INTEGER,
-	name STRING,   
-	image BLOB 
-	)
-''')
-db.commit()
+class DatabaseManager:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.cursor = self.conn.cursor()
+        self.setup()
 
-# Funkcja do sprawdzenia, czy tabela użytkowników jest pusta
-def is_users_table_empty():
-	db = sqlite3.connect("Baza_osób_upoważnionych.db")
-	cursor = db.cursor()
-	cursor.execute("SELECT COUNT(*) FROM users")
-	count = cursor.fetchone()[0]
-	db.close()
-	return count == 0
+    def setup(self):
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            username STRING,   
+            image BLOB 
+            )
+        ''')
+        self.conn.commit()
 
-# Funkcja do zapisywania nowego użytkownika
-def save_new_user(image, name):
-	db = sqlite3.connect("Baza_osób_upoważnionych.db")
-	cursor = db.cursor()
-	_, img_encoded = cv2.imencode('.jpg', image)
-	img_bytes = img_encoded.tobytes()
-	cursor.execute("INSERT INTO users (id, name, image) VALUES (1, ?, ?)", (name, img_bytes))
-	db.commit()
-	db.close()
-	print("Zapisano nowego użytkownika.")
+    def get_user_image(self, name):
+        try:
+            self.cursor.execute("SELECT image FROM users WHERE username = ?", (name,))
+            result = self.cursor.fetchone()
+            if result:
+                img_blob = result[0]
+                np_img = np.frombuffer(img_blob, dtype=np.uint8)
+                image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+                return image
+            else:
+                print("Użytkownik nie znaleziony.")
+                return None
+        except sqlite3.Error as e:
+            print(f"Błąd bazy danych: {e}")
+            return None
 
-# Klasa CameraReaderThread służy do ciągłego czytania ramek z kamery w osobnym wątku
+    def save_new_user(self, image, username):
+        try:
+            _, img_encoded = cv2.imencode('.jpg', image)
+            img_bytes = img_encoded.tobytes()
+            self.cursor.execute("INSERT INTO users (username, image) VALUES (?, ?)", (username, img_bytes))
+            self.conn.commit()
+            print("Zapisano nowego użytkownika.")
+        except sqlite3.Error as e:
+            print(f"Błąd bazy danych: {e}")
+
+    def how_many_users_in_db(self):
+        try:
+            self.cursor.execute("SELECT COUNT(*) FROM users")
+            count = self.cursor.fetchone()[0]
+            return count
+        except sqlite3.Error as e:
+            print(f"Błąd bazy danych: {e}")
+            return 0
+
+    def close(self):
+        self.conn.close()
+
+# Klasa CameraReaderThread z usprawnieniami
 class CameraReaderThread(threading.Thread):
-	def __init__(self, camera, name='camera-reader-thread'):
-		# Zainicjalizowanie zmiennej lock do synchronizacji dostępu do zasobów w wielowątkowości
-		self.lock = threading.Lock()
-		# Zmienna loop do kontrolowania działania pętli w wątku
-		self.loop = threading.Event()
-		# Zmienna camera przechowuje instancję obiektu kamery
-		self.camera = camera
-		# Zmienne curr_frame i last_frame do przechowywania bieżącej i ostatniej ramki
-		self.curr_frame = None
-		self.last_frame = None
-		# Wywołanie konstruktora klasy bazowej i uruchomienie wątku
-		super(CameraReaderThread, self).__init__(name=name)
-		self.start()
+    def __init__(self, camera):
+        self.lock = threading.Lock()
+        self.loop = threading.Event()
+        self.camera = camera
+        self.curr_frame = None
+        self.last_frame = None
+        super(CameraReaderThread, self).__init__()
 
-	def run(self):
-		# Pętla do ciągłego czytania ramek z kamery
-		while not self.loop.is_set():
-			# Czytanie bieżącej ramki z kamery
-			ret, self.curr_frame = self.camera.read()
-			# Zablokowanie dostępu do zasobów podczas aktualizacji ostatniej ramki
-			if not ret:
-				break
-			if self.lock.acquire(timeout=0):
-				try:
-					# Kopiowanie bieżącej ramki do ostatniej ramki
-					self.last_frame = copy.copy(self.curr_frame)
-				finally:
-					# Odblokowanie dostępu do zasobów
-					self.lock.release()
+    def start_thread(self):
+        self.start()
 
-	def get(self):
-		# Bezpieczne pobranie ostatniej ramki
-		self.lock.acquire()
-		try:
-			return copy.copy(self.last_frame)
-		finally:
-			self.lock.release()
+    def run(self):
+        while not self.loop.is_set():
+            ret, self.curr_frame = self.camera.read()
+            if not ret:
+                break
+            with self.lock:
+                self.last_frame = copy.copy(self.curr_frame)
 
-	def stop(self):
-		# Zatrzymanie działania wątku
-		self.loop.set()
+    def get(self):
+        with self.lock:
+            return copy.copy(self.last_frame)
 
-# Logika działania prostego interfejsu dla użytkownika
-if is_users_table_empty():
+    def stop(self):
+        self.loop.set()
+
+
+
+# Utworzenie instancji klasy DatabaseManager
+db_manager = DatabaseManager("Baza_osób_upoważnionych.db")
+
+# Sprawdzenie ilości użytkowników w bazie
+if db_manager.how_many_users_in_db() == 0:
 	print("Witaj użytkowniku, wprowadź swoje dane do programu")
-	name = input("Podaj swoje imie: ")
-	print("Zaraz nastąpi skan twarzy, proszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz, lub 'q' jeśli chcesz przerwać")
-	time.sleep(3)
+	username = input("Podaj swoją nazwę: ")
 else:
-	print("Witaj użytkowniku, zaraz nastąpi weryfikacja twojej tożsamości \nproszę nacisnąć przycisk 's' gdy niebieska ramka obejmie twarz lub 'q' jeśli chcesz przerwać")
-	time.sleep(3)
+	print("Witaj użytkowniku\n")
+	username = input("Podaj nazwę: ")
+	image_from_db_to_compare = db_manager.get_user_image(username)
 
-
-# Tworzenie modelu do wykrywania twarzy z wykorzystaniem klasyfikatora Haar'a
-model = cv2.CascadeClassifier('haarcascade_frontalface_alt_tree.xml')
+# Inicjalizacja modelu do wykrywania twarzy
+face_detector = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 # Ustalenie adresu strumienia wideo
-address = 0    # Zmieniamy wartość w zależności do ilu urządzeń jesteśmy podłączeni
-# Nawiązanie połączenia ze strumieniem wideo
+address = 0
 cap = cv2.VideoCapture(address)
 if not cap.isOpened():
-	# Komunikat o błędzie w przypadku niepowodzenia
-	print("Video stream is not opened.")
+	print("Nie można otworzyć strumienia wideo.")
 	exit(0)
 
 # Uruchomienie wątku do czytania ramek z kamery
-reader = CameraReaderThread(cap)
+camera_thread = CameraReaderThread(cap)
+camera_thread.start_thread()
 
 # Główna pętla programu
-while True:
-	# Pobranie ostatniej ramki z wątku czytającego ramki
-	frame = reader.get()
-	if frame is not None:
-		# Konwersja ramki na skalę szarości
-		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-		# Wykrywanie twarzy w ramce
-		faces = model.detectMultiScale(gray, scaleFactor=1.05, minNeighbors=5)
-		# Rysowanie prostokątów wokół wykrytych twarzy
-		for (x, y, w, h) in faces:
-			cv2.rectangle(frame, (x, y), (x + w, y + h), (190, 0, 0), 2)
-		# Wyświetlanie ramki z zaznaczonymi twarzami
-		cv2.imshow("Camera Feed", frame)
-	# Oczekiwanie na naciśnięcie klawisza 'q' do zakończenia lub 's' do zapisania
-	key = cv2.waitKey(30) & 0xFF
-	if key == ord('q'):
-		break
-	elif key == ord('s') and faces is not None:
-		# Wycinanie twarzy z ramki, gdy wykryto twarze i naciśnięto 's'
-		for (x, y, w, h) in faces:
-			face_frame = frame[y:y + h, x:x + w]
-			if is_users_table_empty():
-				# Zapis tej ramki do bazy danych
-				save_new_user(face_frame, name)
-			else:
-				frame_for_equal = face_frame
-		break
+try:
+	while True:
+		# Pobranie ostatniej ramki
+		frame = camera_thread.get()
+		if frame is not None:
+			gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+			faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5)
 
-# Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
-reader.stop()
-cap.release()
-cv2.destroyAllWindows()
-db.close()
+			for (x, y, w, h) in faces:
+				cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+			cv2.imshow("Camera Feed", frame)
+
+			key = cv2.waitKey(1) & 0xFF
+			if key == ord('q'):
+				break
+			elif key == ord('s') and len(faces) > 0:
+				for (x, y, w, h) in faces:
+					face_frame = frame[y:y + h, x:x + w]
+					if db_manager.how_many_users_in_db() == 0:
+						db_manager.save_new_user(face_frame, username)
+					else:
+						result_of_comparing = Deepface.verify(img1_path=saved_face_frame, img2_path=image_from_db_to_compare)
+						pass
+except Exception as e:
+	print(f"Wystąpił błąd: {e}")
+finally:
+	# Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
+	camera_thread.stop()
+	cap.release()
+	cv2.destroyAllWindows()
+	db_manager.close()
+print(result_of_comparing)
