@@ -5,6 +5,8 @@ import sqlite3
 import matplotlib.pyplot as plt
 import numpy as np
 from deepface import DeepFace
+import os
+
 
 class DatabaseManager:
 	def __init__(self, db_path):
@@ -31,8 +33,7 @@ class DatabaseManager:
 				img_blob = result[0]
 				np_img = np.frombuffer(img_blob, dtype=np.uint8)
 				image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
-				_, img_encoded = cv2.imencode('.jpg', image)  # Kodowanie obrazu do formatu, który może być używany przez DeepFace.verify
-				return img_encoded  # Zwrócenie obrazu w postaci bajtów
+				return image
 			else:
 				print("Użytkownik nie znaleziony.")
 				return None
@@ -112,7 +113,7 @@ def main():
 
 	# Ustalenie adresu strumienia wideo
 	address = 0
-	cap = cv2.VideoCapture(address)
+	cap = cv2.VideoCapture(address, cv2.CAP_DSHOW)
 	if not cap.isOpened():
 		print("Nie można otworzyć strumienia wideo.")
 		exit(0)
@@ -145,8 +146,8 @@ def main():
 						db_manager.save_new_user(face_frame, username)
 					else:
 						face_frame = frame[y:y + h, x:x + w]
-						_, img_encoded = cv2.imencode('.jpg', face_frame)
-						img2 = img_encoded
+						img2 = face_frame
+						cv2.imshow('face_frame', img2)
 				break
 
 		if db_manager.how_many_users_in_db() != 0:
@@ -155,14 +156,23 @@ def main():
 			plt.imshow(img2[:, :, ::-1])
 			plt.show()
 
-			result = DeepFace.verify(img1, img2)
-			print("Czy to ta sama twarz: "), result["verified"]\
+			cv2.imwrite('temp_img1.jpg', img1)
+			cv2.imwrite('temp_img2.jpg', img2)
+
+			try:
+				result = DeepFace.verify('temp_img1.jpg', 'temp_img2.jpg')
+				print("Czy to ta sama twarz: ", result['verified'])
+			except Exception as e:
+				print(f"Wystąpił błąd podczas weryfikacji: {e}")
+
 
 	except Exception as e:
 		print(f"Wystąpił błąd: {e}")
 
 	finally:
 		# Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
+		os.remove('temp_img1.jpg')
+		os.remove('temp_img2.jpg')
 		camera_thread.stop()
 		cap.release()
 		cv2.destroyAllWindows()
