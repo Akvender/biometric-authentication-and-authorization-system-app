@@ -2,10 +2,11 @@ import threading
 import copy
 import cv2
 import sqlite3
-import matplotlib.pyplot as plt
 import numpy as np
 from deepface import DeepFace
+import matplotlib.pyplot as plt
 import os
+
 
 class DatabaseManager:
     def __init__(self, db_path):
@@ -50,17 +51,9 @@ class DatabaseManager:
         except sqlite3.Error as e:
             print(f"Błąd bazy danych: {e}")
 
-    def how_many_users_in_db(self):
-        try:
-            self.cursor.execute("SELECT COUNT(*) FROM users")
-            count = self.cursor.fetchone()[0]
-            return count
-        except sqlite3.Error as e:
-            print(f"Błąd bazy danych: {e}")
-            return 0
-
     def close(self):
         self.conn.close()
+
 
 class CameraReaderThread(threading.Thread):
     def __init__(self, camera):
@@ -89,6 +82,16 @@ class CameraReaderThread(threading.Thread):
     def stop(self):
         self.loop.set()
 
+
+def face_verification(file1, file2):
+    try:
+        result = DeepFace.verify('temp_img1.jpg', 'temp_img2.jpg')
+        return result['verified']
+    except Exception as e:
+        print(f"Wystąpił błąd podczas weryfikacji: {e}")
+        return None
+
+
 def main():
     db_manager = DatabaseManager("Baza_osób_upoważnionych.db")
 
@@ -98,7 +101,6 @@ def main():
 
     if user_input == 1:
         print(f"Witaj, zaraz nastąpi próba logowania na konto użytkownika {username}")
-        img1 = db_manager.get_user_image(username)
     elif user_input == 2:
         print(f"Witaj {username}, wprowadź skan swojej twarzy do systemu, aby zarejestrować się w systemie")
     else:
@@ -133,23 +135,18 @@ def main():
                 for (x, y, w, h) in faces:
                     if user_input == 1:
                         face_frame = frame[y:y + h, x:x + w]
+
+                        img1 = db_manager.get_user_image(username)
                         img2 = face_frame
 
-                        plt.imshow(img1[:, :, ::-1])
+                        # Wczytaj obrazy do plt.imshow bezpośrednio z pamięci, nie z pliku
+                        plt.imshow(cv2.cvtColor(img1, cv2.COLOR_BGR2RGB))
                         plt.show()
-                        plt.imshow(img2[:, :, ::-1])
+                        plt.imshow(cv2.cvtColor(img2, cv2.COLOR_BGR2RGB))
                         plt.show()
 
                         cv2.imwrite('temp_img1.jpg', img1)
                         cv2.imwrite('temp_img2.jpg', img2)
-
-                        try:
-                            result = DeepFace.verify('temp_img1.jpg', 'temp_img2.jpg')
-                            print("Czy to ta sama twarz: ", result['verified'])
-                            os.remove('temp_img1.jpg')
-                            os.remove('temp_img2.jpg')
-                        except Exception as e:
-                            print(f"Wystąpił błąd podczas weryfikacji: {e}")
 
                     elif user_input == 2:
                         face_frame = frame[y:y + h, x:x + w]
@@ -167,6 +164,16 @@ def main():
         cap.release()
         cv2.destroyAllWindows()
         db_manager.close()
+
+    if user_input == 1:
+        # Jeśli obrazy zostały zapisane i istnieją, próbuj weryfikacji
+        if face_verification('temp_img1.jpg', 'temp_img2.jpg'):
+            print(f"Autoryzacja powiodła się, Witaj {username}")
+        else:
+            print("Autoryzacja nie powiodła się")
+
+        os.remove('temp_img1.jpg')
+        os.remove('temp_img2.jpg')
 
 if __name__ == "__main__":
     main()
