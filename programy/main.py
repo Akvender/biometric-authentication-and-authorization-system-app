@@ -4,7 +4,6 @@ import cv2
 import sqlite3
 import numpy as np
 from deepface import DeepFace
-import matplotlib.pyplot as plt
 import os
 
 
@@ -138,12 +137,6 @@ def main():
 
                         img1 = db_manager.get_user_image(username)
                         img2 = face_frame
-
-                        # Wczytaj obrazy do plt.imshow bezpośrednio z pamięci, nie z pliku
-                        plt.imshow(cv2.cvtColor(img1, cv2.COLOR_BGR2RGB))
-                        plt.show()
-                        plt.imshow(cv2.cvtColor(img2, cv2.COLOR_BGR2RGB))
-                        plt.show()
 
                         cv2.imwrite('temp_img1.jpg', img1)
                         cv2.imwrite('temp_img2.jpg', img2)
