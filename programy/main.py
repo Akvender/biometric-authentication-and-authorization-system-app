@@ -40,45 +40,7 @@ class DatabaseManager:
             if self.cursor.fetchone() is not None:
                 messagebox.showerror('Błąd', 'Nazwa użytkownika zajęta.')
             else:
-                try:
-                    face_detector = cv2.CascadeClassifier(
-                        cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
-                    cap = cv2.VideoCapture(0)
-                    if not cap.isOpened():
-                        print("Nie można otworzyć strumienia wideo.")
-                        exit(0)
-
-                    camera_thread = CameraReaderThread(cap)
-                    camera_thread.start_thread()
-                    while True:
-
-                        frame = camera_thread.get()
-                        if frame is not None:
-                            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                            faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.05, minNeighbors=5)
-
-                            for (x, y, w, h) in faces:
-                                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-                            cv2.imshow("Camera Feed", frame)
-
-                        key = cv2.waitKey(30) & 0xFF
-                        if key == ord('q'):
-                            break
-                        elif key == ord('s') and len(faces) > 0:
-                            for (x, y, w, h) in faces:
-                                    face_frame = frame[y:y + h, x:x + w]
-                            break
-
-                except Exception as e:
-                    print(f"Wystąpił błąd: {e}")
-
-                finally:
-                    # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
-                    camera_thread.stop()
-                    cap.release()
-                    cv2.destroyAllWindows()
-
+                face_frame = get_frame_from_camera()
                 _, img_encoded = cv2.imencode('.jpg', face_frame)
                 img_bytes = img_encoded.tobytes()
 
@@ -101,47 +63,7 @@ class DatabaseManager:
             self.cursor.execute('SELECT password FROM users WHERE username=?', [username])
             result = self.cursor.fetchone()
 
-            try:
-                face_detector = cv2.CascadeClassifier(
-                    cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
-                cap = cv2.VideoCapture(0)
-                if not cap.isOpened():
-                    print("Nie można otworzyć strumienia wideo.")
-                    exit(0)
-
-                camera_thread = CameraReaderThread(cap)
-                camera_thread.start_thread()
-                while True:
-
-                    frame = camera_thread.get()
-                    if frame is not None:
-                        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.05, minNeighbors=5)
-
-                        for (x, y, w, h) in faces:
-                            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-                        cv2.imshow("Camera Feed", frame)
-
-                    key = cv2.waitKey(30) & 0xFF
-                    if key == ord('q'):
-                        break
-                    elif key == ord('s') and len(faces) > 0:
-                        for (x, y, w, h) in faces:
-                            face_frame = frame[y:y + h, x:x + w]
-                        break
-
-            except Exception as e:
-                print(f"Wystąpił błąd: {e}")
-
-            finally:
-                # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
-                camera_thread.stop()
-                cap.release()
-                cv2.destroyAllWindows()
-
-            image2 = face_frame
-
+            image2 = get_frame_from_camera()
             if result:
                 if bcrypt.checkpw(password.encode('utf-8'), result[0]) and face_verification(image, image2):
                     messagebox.showinfo('Sukces', 'Zalogowano się pomyślnie.')
@@ -200,6 +122,47 @@ class CameraReaderThread(threading.Thread):
     def stop(self):
         self.loop.set()
 
+
+def get_frame_from_camera():
+    try:
+        face_detector = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Nie można otworzyć strumienia wideo.")
+            exit(0)
+
+        camera_thread = CameraReaderThread(cap)
+        camera_thread.start_thread()
+        while True:
+
+            frame = camera_thread.get()
+            if frame is not None:
+                gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.05, minNeighbors=5)
+
+                for (x, y, w, h) in faces:
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+                cv2.imshow("Camera Feed", frame)
+
+            key = cv2.waitKey(30) & 0xFF
+            if key == ord('q'):
+                break
+            elif key == ord('s') and len(faces) > 0:
+                for (x, y, w, h) in faces:
+                    face_frame = frame[y:y + h, x:x + w]
+                break
+
+    except Exception as e:
+        print(f"Wystąpił błąd: {e}")
+
+    finally:
+        # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
+        camera_thread.stop()
+        cap.release()
+        cv2.destroyAllWindows()
+        return face_frame
 
 def face_verification(img1, img2):
 
