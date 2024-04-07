@@ -1,15 +1,31 @@
 import threading
 import copy
+import sys
+import subprocess
+from tkinter import *
+from tkinter import messagebox
+import os
+
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+
+install("opencv-python")
+install("db-sqlite3")
+install("numpy")
+install("customtkinter")
+install("bcrypt")
+install("deepface")
+
+
 import cv2
 import sqlite3
 import numpy as np
-import os
 import customtkinter
 import bcrypt
-
 from deepface import DeepFace
-from tkinter import *
-from tkinter import messagebox
+
 
 class DatabaseManager:
     def __init__(self, db_path):
@@ -123,8 +139,17 @@ class CameraReaderThread(threading.Thread):
         self.loop.set()
 
 
+def find(name, path):
+    for root, dirs, files in os.walk(path):
+        if name in files:
+            return os.path.join(root, name)
+
+
 def get_frame_from_camera():
     try:
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        find("haarcascade_frontalface_alt_tree.xml", root_dir)
+
         face_detector = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
         cap = cv2.VideoCapture(0)
