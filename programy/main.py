@@ -103,6 +103,7 @@ def get_frame_from_camera():
     face_frame = None
     camera_thread = None
     cap = None
+    faces = None
     try:
         root_dir = os.path.dirname(os.path.abspath(__file__))
         tools.find("haarcascade_frontalface_alt_tree.xml", root_dir)
