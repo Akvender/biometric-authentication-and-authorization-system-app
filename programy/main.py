@@ -1,22 +1,16 @@
-import threading
-import copy
-import sys
-import subprocess
 from tkinter import *
 from tkinter import messagebox
 import os
+import camera_reader
+import tools as tools
 
 
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-
-install("opencv-python")
-install("db-sqlite3")
-install("numpy")
-install("customtkinter")
-install("bcrypt")
-install("deepface")
+tools.install("opencv-python")
+tools.install("db-sqlite3")
+tools.install("numpy")
+tools.install("customtkinter")
+tools.install("bcrypt")
+tools.install("deepface")
 
 
 import cv2
@@ -34,7 +28,6 @@ class DatabaseManager:
         self.cursor = self.conn.cursor()
         self.setup()
 
-
     def setup(self):
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -45,7 +38,6 @@ class DatabaseManager:
             )
         ''')
         self.conn.commit()
-
 
     def zalozkonto(self):
         username = uzytkownikentry.get()
@@ -62,13 +54,11 @@ class DatabaseManager:
 
                 encoded_password = password.encode('utf-8')
                 hashed_password = bcrypt.hashpw(encoded_password, bcrypt.gensalt())
-                print(hashed_password)
                 self.cursor.execute('INSERT INTO users (username, password, image) VALUES (?, ?, ?)', [username, hashed_password, img_bytes])
                 self.conn.commit()
                 messagebox.showinfo('Sukces', 'Twoje konto zostało stworzone.')
         else:
             messagebox.showerror('Błąd', 'Wprowadź nazwę użytkownika i hasło.')
-
 
     def flogin(self):
         username = uzytkownikentry2.get()
@@ -89,7 +79,6 @@ class DatabaseManager:
             else:
                 messagebox.showerror('Błąd', 'Wprowadź poprawne dane.')
 
-
     def get_user_image(self, name):
         try:
             self.cursor.execute("SELECT image FROM users WHERE username = ?", (name,))
@@ -106,49 +95,17 @@ class DatabaseManager:
             print(f"Błąd bazy danych: {e}")
             return None
 
-
     def close(self):
         self.conn.close()
 
 
-class CameraReaderThread(threading.Thread):
-    def __init__(self, camera):
-        threading.Thread.__init__(self)
-        self.lock = threading.Lock()
-        self.loop = threading.Event()
-        self.camera = camera
-        self.curr_frame = None
-        self.last_frame = None
-
-    def start_thread(self):
-        self.start()
-
-    def run(self):
-        while not self.loop.is_set():
-            ret, self.curr_frame = self.camera.read()
-            if not ret:
-                break
-            with self.lock:
-                self.last_frame = copy.copy(self.curr_frame)
-
-    def get(self):
-        with self.lock:
-            return copy.copy(self.last_frame)
-
-    def stop(self):
-        self.loop.set()
-
-
-def find(name, path):
-    for root, dirs, files in os.walk(path):
-        if name in files:
-            return os.path.join(root, name)
-
-
 def get_frame_from_camera():
+    face_frame = None
+    camera_thread = None
+    cap = None
     try:
         root_dir = os.path.dirname(os.path.abspath(__file__))
-        find("haarcascade_frontalface_alt_tree.xml", root_dir)
+        tools.find("haarcascade_frontalface_alt_tree.xml", root_dir)
 
         face_detector = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
@@ -157,7 +114,7 @@ def get_frame_from_camera():
             print("Nie można otworzyć strumienia wideo.")
             exit(0)
 
-        camera_thread = CameraReaderThread(cap)
+        camera_thread = camera_reader.CameraReaderThread(cap)
         camera_thread.start_thread()
         while True:
 
@@ -184,10 +141,13 @@ def get_frame_from_camera():
 
     finally:
         # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
-        camera_thread.stop()
-        cap.release()
+        if camera_thread:
+            camera_thread.stop()
+        if cap:
+            cap.release()
         cv2.destroyAllWindows()
         return face_frame
+
 
 def face_verification(img1, img2):
 
@@ -210,7 +170,7 @@ app = customtkinter.CTk()
 app.title("Logowanie")
 app.geometry('500x400')
 app.config(bg="#64147a")
-app.resizable(width=False,height=False)
+app.resizable(width=False, height=False)
 
 font1 = ('Verdana',19)
 font2 = ('Verdana',15)
@@ -264,7 +224,6 @@ def logowanie():
     loginbutton.place(x=61, y=120)
 
 
-##
 signupframe = customtkinter.CTkFrame(app,width=200,height=400)
 signupframe.place(x=300,y=0)
 
