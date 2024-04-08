@@ -1,7 +1,7 @@
 from tkinter import *
 from tkinter import messagebox
-import os
-import camera_reader
+import Face_images.camera_reader
+import Face_images.face_verification
 import tools as tools
 
 
@@ -18,7 +18,6 @@ import sqlite3
 import numpy as np
 import customtkinter
 import bcrypt
-from deepface import DeepFace
 
 
 class DatabaseManager:
@@ -48,7 +47,7 @@ class DatabaseManager:
             if self.cursor.fetchone() is not None:
                 messagebox.showerror('Błąd', 'Nazwa użytkownika zajęta.')
             else:
-                face_frame = get_frame_from_camera()
+                face_frame = Face_images.camera_reader.get_frame_from_camera()
                 _, img_encoded = cv2.imencode('.jpg', face_frame)
                 img_bytes = img_encoded.tobytes()
 
@@ -69,9 +68,9 @@ class DatabaseManager:
             self.cursor.execute('SELECT password FROM users WHERE username=?', [username])
             result = self.cursor.fetchone()
 
-            image2 = get_frame_from_camera()
+            image2 = Face_images.camera_reader.get_frame_from_camera()
             if result:
-                if bcrypt.checkpw(password.encode('utf-8'), result[0]) and face_verification(image, image2):
+                if bcrypt.checkpw(password.encode('utf-8'), result[0]) and Face_images.face_verification.face_recognition(image, image2):
                     messagebox.showinfo('Sukces', 'Zalogowano się pomyślnie.')
 
                 else:
@@ -97,74 +96,6 @@ class DatabaseManager:
 
     def close(self):
         self.conn.close()
-
-
-def get_frame_from_camera():
-    face_frame = None
-    camera_thread = None
-    cap = None
-    faces = None
-    try:
-        root_dir = os.path.dirname(os.path.abspath(__file__))
-        tools.find("haarcascade_frontalface_alt_tree.xml", root_dir)
-
-        face_detector = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_alt_tree.xml')
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            print("Nie można otworzyć strumienia wideo.")
-            exit(0)
-
-        camera_thread = camera_reader.CameraReaderThread(cap)
-        camera_thread.start_thread()
-        while True:
-
-            frame = camera_thread.get()
-            if frame is not None:
-                gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.05, minNeighbors=5)
-
-                for (x, y, w, h) in faces:
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-                cv2.imshow("Camera Feed", frame)
-
-            key = cv2.waitKey(30) & 0xFF
-            if key == ord('q'):
-                break
-            elif key == ord('s') and len(faces) > 0:
-                for (x, y, w, h) in faces:
-                    face_frame = frame[y:y + h, x:x + w]
-                break
-
-    except Exception as e:
-        print(f"Wystąpił błąd: {e}")
-
-    finally:
-        # Zakończenie pracy wątku, zwolnienie zasobów kamery i zamknięcie wszystkich okien
-        if camera_thread:
-            camera_thread.stop()
-        if cap:
-            cap.release()
-        cv2.destroyAllWindows()
-        return face_frame
-
-
-def face_verification(img1, img2):
-
-    cv2.imwrite('temp_img1.jpg', img1)
-    cv2.imwrite('temp_img2.jpg', img2)
-    result = DeepFace.verify('temp_img1.jpg', 'temp_img2.jpg')
-
-    if result:
-        os.remove('temp_img1.jpg')
-        os.remove('temp_img2.jpg')
-        return True
-    else:
-        os.remove('temp_img1.jpg')
-        os.remove('temp_img2.jpg')
-        print("Weryfikacja nie powiodła się")
-        return False
 
 
 app = customtkinter.CTk()
