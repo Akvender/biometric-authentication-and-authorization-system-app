@@ -68,7 +68,7 @@ def get_frame_from_camera():
             key = cv2.waitKey(30) & 0xFF
             if key == ord('q'):
                 break
-            elif key == ord('s') and len(faces) > 0:
+            elif key == ord('s') and len(faces) == 1:
                 for (x, y, w, h) in faces:
                     face_frame = frame[y:y + h, x:x + w]
                 break

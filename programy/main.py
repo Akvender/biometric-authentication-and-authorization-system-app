@@ -2,15 +2,15 @@ from tkinter import *
 from tkinter import messagebox
 import Face_images.camera_reader
 import Face_images.face_verification
-import tools as tools
+# import tools
 
 
-tools.install("opencv-python")
-tools.install("db-sqlite3")
-tools.install("numpy")
-tools.install("customtkinter")
-tools.install("bcrypt")
-tools.install("deepface")
+# tools.install("opencv-python")
+# tools.install("db-sqlite3")
+# tools.install("numpy")
+# tools.install("customtkinter")
+# tools.install("bcrypt")
+# tools.install("deepface")
 
 
 import cv2
@@ -62,17 +62,15 @@ class DatabaseManager:
     def flogin(self):
         username = uzytkownikentry2.get()
         password = hasloentry2.get()
-        image = db_manager.get_user_image(username)
 
         if username != '' and password != '':
             self.cursor.execute('SELECT password FROM users WHERE username=?', [username])
             result = self.cursor.fetchone()
-
+            image = db_manager.get_user_image(username)
             image2 = Face_images.camera_reader.get_frame_from_camera()
             if result:
                 if bcrypt.checkpw(password.encode('utf-8'), result[0]) and Face_images.face_verification.face_recognition(image, image2):
                     messagebox.showinfo('Sukces', 'Zalogowano się pomyślnie.')
-
                 else:
                     messagebox.showerror('Błąd', 'Wprowadzono niepasujące dane.')
             else:
