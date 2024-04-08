@@ -15,7 +15,6 @@ def face_recognition(img1, img2):
         return result
 
     except:
-        print("Obrazy się nie zgadzają: ")
         os.remove('temp_img1.jpg')
         os.remove('temp_img2.jpg')
         return False
