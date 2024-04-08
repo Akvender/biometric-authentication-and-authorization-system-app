@@ -2,15 +2,15 @@ from tkinter import *
 from tkinter import messagebox
 import Face_images.camera_reader
 import Face_images.face_verification
-# import tools
+import tools
 
 
-# tools.install("opencv-python")
-# tools.install("db-sqlite3")
-# tools.install("numpy")
-# tools.install("customtkinter")
-# tools.install("bcrypt")
-# tools.install("deepface")
+tools.install("opencv-python")
+tools.install("db-sqlite3")
+tools.install("numpy")
+tools.install("customtkinter")
+tools.install("bcrypt")
+tools.install("deepface")
 
 
 import cv2

@@ -12,8 +12,7 @@ def face_recognition(img1, img2):
         result = DeepFace.verify('temp_img1.jpg', 'temp_img2.jpg')
         os.remove('temp_img1.jpg')
         os.remove('temp_img2.jpg')
-        return result
-
+        return result['verified']
     except:
         os.remove('temp_img1.jpg')
         os.remove('temp_img2.jpg')
